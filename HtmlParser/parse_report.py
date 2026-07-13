@@ -20,10 +20,11 @@ soup = BeautifulSoup(html_content, 'html.parser')
 # Find all divs with class 'Failed'
 failed_decisions = soup.find_all('div', class_='Failed')
 
-# Loop through each 'Failed' div and extract relevant info
-# Skip the first 5 since they are common to all results and process the rest
-for i, div in enumerate(failed_decisions[5:], start=6):  # start=6 to reflect actual position
-    # Find the 'header_Failed' div inside the current div
+# Initialize a list to hold concatenated strings
+concatenated_list = []
+
+# Skip the first 4 and process the rest
+for i, div in enumerate(failed_decisions[4:], start=5):  # start=5 to reflect actual position
     header_div = div.find('div', class_='header_Failed')
     if header_div:
         # Extract tb_name
@@ -34,8 +35,18 @@ for i, div in enumerate(failed_decisions[5:], start=6):  # start=6 to reflect ac
         tb_library_span = header_div.find('span', class_='tb_library')
         tb_library = tb_library_span.get_text(strip=True) if tb_library_span else None
 
-        print(f"FailedDecision #{i}:")
-        print(f"  tb_name: {tb_name}")
-        print(f"  tb_library: {tb_library}\n")
+        # Append to list if available
+        if tb_name and tb_library:
+            concatenated_list.append(f"{tb_name}.{tb_library}")
+        elif tb_name:
+            concatenated_list.append(f"{tb_name}")
+        elif tb_library:
+            concatenated_list.append(f"{tb_library}")
+        # If neither is available, skip
     else:
-        print(f"FailedDecision #{i}: header_Failed div not found.\n")
+        continue
+
+# Join all entries into a single string separated by commas (or any separator you prefer)
+result_string = ' :: '.join(concatenated_list)
+
+print("The failure occurs at:", result_string)
