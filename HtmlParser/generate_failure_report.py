@@ -3,9 +3,7 @@ import argparse
 import pandas as pd
 from bs4 import BeautifulSoup
 import chardet
-from openpyxl import load_workbook
-from openpyxl.utils import get_column_letter
-from openpyxl.styles import Alignment
+from ExcelFormatter import ExcelFormatter
 
 def main():
     parser = argparse.ArgumentParser(description='Generate failure report from HTML report file.')
@@ -18,7 +16,7 @@ def main():
 
     # Extract the directory name containing the html_file
     test_name = os.path.basename(os.path.dirname(html_file))
-    
+
     # Detect file encoding
     with open(html_file, 'rb') as file:
         rawdata = file.read()
@@ -70,24 +68,10 @@ def main():
     # Save to Excel
     df.to_excel(output_file, index=False)
 
-    # Format the Excel file
-    wb = load_workbook(output_file)
-    ws = wb.active
-
-    # Adjust column widths and wrap text
-    for column_cells in ws.columns:
-        max_length = 0
-        column_letter = get_column_letter(column_cells[0].column)
-        for cell in column_cells:
-            # Enable wrap_text if desired
-            # cell.alignment = Alignment(wrap_text=True)
-            if cell.value:
-                max_length = max(max_length, len(str(cell.value)))
-        adjusted_width = max_length + 2
-        ws.column_dimensions[column_letter].width = adjusted_width
-
-    wb.save(output_file)
-    print(f"Formatted Excel report saved to {output_file}")
+    # format the Excel file
+    formatter = ExcelFormatter(output_file)
+    formatter.adjust_columns()
+    print(f"Failure report saved to {output_file}")
 
 if __name__ == '__main__':
     main()

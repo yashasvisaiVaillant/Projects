@@ -25,5 +25,11 @@ for /d %%F in (*) do (
 )
 
 echo All subfolders processed.
+
+REM Call the merge script
+echo Merging reports into combined_failure_report.xlsx...
+python "%SCRIPTS_DIR%\merge_reports.py"
+
+echo Merging complete.
 pause
 endlocal
