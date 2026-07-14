@@ -18,8 +18,7 @@ def main():
 
     # Extract the directory name containing the html_file
     test_name = os.path.basename(os.path.dirname(html_file))
-    print(test_name)
-
+    
     # Detect file encoding
     with open(html_file, 'rb') as file:
         rawdata = file.read()
