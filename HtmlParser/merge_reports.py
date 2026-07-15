@@ -1,3 +1,4 @@
+# Merges individual failure reports into a single Excel file and formats it
 import os
 import pandas as pd
 from ExcelFormatter import ExcelFormatter

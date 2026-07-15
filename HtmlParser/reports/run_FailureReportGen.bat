@@ -16,7 +16,7 @@ for /d %%F in (*) do (
             echo Processing %%F
             REM Run your script
             set "OUTPUT_FILE=%%F\failure_report.xlsx"
-            python "%SCRIPTS_DIR%\generate_failure_report.py" --html_file "!DATA_FILE!" --output_file "!OUTPUT_FILE!"
+            python "%SCRIPTS_DIR%\generate_report.py" --html_file "!DATA_FILE!" --output_file "!OUTPUT_FILE!"
         ) else (
             echo data.html not found in folder: %%F
         )
