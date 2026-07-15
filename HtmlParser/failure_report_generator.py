@@ -37,6 +37,11 @@ class FailureReportGenerator:
 
         print(f"Total unique failures recorded: {len(traverser.failure_set)}")  # Debug
 
+        # Do not generate a report if there are no failures
+        if not traverser.failure_set:
+            print(f"No failures found in {self.html_file}. Skipping report generation.")
+            return
+
         # Save failures to DataFrame
         df = pd.DataFrame({'Failure Step': list(traverser.failure_set)})
         df['Test Name'] = test_name

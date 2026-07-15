@@ -6,28 +6,38 @@ set "SCRIPTS_DIR=C:\Yashasvi\Projects\HtmlParser"
 
 REM Loop through each subfolder
 for /d %%F in (*) do (
-    REM Check if it's a directory
-    if exist "%%F\" (
-        REM Construct full path to data.html
-        set "DATA_FILE=%%F\data.html"
-        echo Checking: !DATA_FILE!
-        if exist "!DATA_FILE!" (
-            echo Found: !DATA_FILE!
-            echo Processing %%F
-            REM Run your script
+    echo Checking folder: %%F
+
+    REM Find all matching data*.html files
+    set "FOUND=0"
+
+    for %%H in ("%%F\data*.html") do (
+        if exist "%%H" (
+            set "FOUND=1"
+
+            echo Found: %%H
+
+            REM Use filename without extension for output
+            set "BASE_NAME=%%~nH"
             set "OUTPUT_FILE=%%F\failure_report.xlsx"
-            python "%SCRIPTS_DIR%\generate_report.py" --html_file "!DATA_FILE!" --output_file "!OUTPUT_FILE!"
-        ) else (
-            echo data.html not found in folder: %%F
+
+            python "%SCRIPTS_DIR%\generate_report.py" ^
+                --html_file "%%H" ^
+                --output_file "!OUTPUT_FILE!"
         )
-        echo.
     )
+
+    if !FOUND! == 0 (
+        echo No data*.html files found in folder: %%F
+    )
+
+    echo.
 )
 
 echo All subfolders processed.
 
-REM Call the merge script
-echo Merging reports into combined_failure_report.xlsx...
+REM Call merge script
+echo Merging reports...
 python "%SCRIPTS_DIR%\merge_reports.py"
 
 echo Merging complete.
