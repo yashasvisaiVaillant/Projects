@@ -1,14 +1,45 @@
 # This script generates a failure report from an HTML file containing test results.
 
-import csv
 import os
-from os import path
 import pandas as pd
 from bs4 import BeautifulSoup
 from failure_traverser import FailureTraverser
 from ExcelFormatter import ExcelFormatter
 
 
+def read_html_with_detected_encoding(path): 
+    # Encoding robustness: Why it’s needed:
+    # It was observed that some of the Test data HTML files came in different encodings (UTF‑8, UTF‑16)
+    # This can raise UnicodeDecodeError or silently corrupt characters.
+    # A robust approach tries detection first, then falls back safely.
+    
+    # Read raw bytes 
+    with open(path, 'rb') as f: 
+        raw = f.read()
+    # Try chardet if available
+    enc = None
+    try:
+        import chardet
+        info = chardet.detect(raw) or {}
+        enc = info.get('encoding')
+    except Exception:
+        enc = None
+
+    # Try detected encoding strictly; on error, fall back
+    if enc:
+        try:
+            return raw.decode(enc, errors='strict')
+        except Exception:
+            pass
+
+    # Try BOM-aware UTF-8 first
+    try:
+        return raw.decode('utf-8-sig', errors='strict')
+    except Exception:
+        # Final fallback that never fails (may replace undecodable bytes)
+        return raw.decode('utf-8', errors='replace')
+
+    
 class FailureReportGenerator:
     def __init__(self, html_file, output_file):
         self.html_file = html_file
@@ -37,7 +68,7 @@ class FailureReportGenerator:
         if not traverser.failure_set:
             print(f"No failures found in {self.html_file}. Skipping report generation.")
             return False
-
+            
         # Build sorted list of failure steps
         steps = sorted(
             traverser.failure_set,
@@ -60,10 +91,6 @@ class FailureReportGenerator:
 
         # Create DataFrame
         df = pd.DataFrame(rows, columns=['Test Name', 'Failure Step'])
-
-        # Ensure output directory exists
-        out_dir = os.path.dirname(os.path.abspath(self.output_file))
-        os.makedirs(out_dir, exist_ok=True)
 
         # Write to Excel with openpyxl
         from openpyxl import Workbook
@@ -98,36 +125,3 @@ class FailureReportGenerator:
         wb.save(self.output_file)
         print(f"Excel report written to: {self.output_file}")
         return True
-
-
-# Encoding robustness: Why it’s needed:
-# It was observed that some of the Test data HTML files came in different encodings (UTF‑8, UTF‑16)
-# This can raise UnicodeDecodeError or silently corrupt characters.
-# A robust approach tries detection first, then falls back safely.^
-
-def read_html_with_detected_encoding(path): 
-    # Read raw bytes 
-    with open(path, 'rb') as f: 
-        raw = f.read()
-    # Try chardet if available
-    enc = None
-    try:
-        import chardet
-        info = chardet.detect(raw) or {}
-        enc = info.get('encoding')
-    except Exception:
-        enc = None
-
-    # Try detected encoding strictly; on error, fall back
-    if enc:
-        try:
-            return raw.decode(enc, errors='strict')
-        except Exception:
-            pass
-
-    # Try BOM-aware UTF-8 first
-    try:
-        return raw.decode('utf-8-sig', errors='strict')
-    except Exception:
-        # Final fallback that never fails (may replace undecodable bytes)
-        return raw.decode('utf-8', errors='replace')
