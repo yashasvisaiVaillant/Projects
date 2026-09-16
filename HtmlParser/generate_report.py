@@ -1,6 +1,7 @@
-# Generate a combined failure report from an HTML report file.
+# Main function
 
 import argparse
+import sys
 from failure_report_generator import FailureReportGenerator
 
 def main():
@@ -10,7 +11,18 @@ def main():
     args = parser.parse_args()
 
     generator = FailureReportGenerator(args.html_file, args.output_file)
-    generator.run()
+    try:
+        created = generator.run()
+        if created:
+            print("Report created.")
+        else:
+            print("No failures; report not created.")
+        sys.exit(0)
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
 if __name__ == '__main__':
     main()
+
+
