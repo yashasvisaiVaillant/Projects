@@ -38,17 +38,34 @@ class FailureReportGenerator:
             print(f"No failures found in {self.html_file}. Skipping report generation.")
             return False
 
-        # Build deterministic, case-insensitive sorted list
+        # Build sorted list of failure steps
         steps = sorted(
             traverser.failure_set,
             key=lambda s: s.casefold() if isinstance(s, str) else str(s).casefold()
         )
 
+        # Prepare data for DataFrame: first row with test name + first failure step
+        rows = []
+
+        if steps:
+            # First row: include test name and first failure step
+            rows.append([test_name, steps[0]])
+            # Remaining rows: only failure steps, leave test name cell empty
+            for step in steps[1:]:
+                rows.append(['', step])
+        else:
+            # No failures, no report
+            print(f"No failures found in {self.html_file}. Skipping report generation.")
+            return False
+
+        # Create DataFrame
+        df = pd.DataFrame(rows, columns=['Test Name', 'Failure Step'])
+
         # Ensure output directory exists
         out_dir = os.path.dirname(os.path.abspath(self.output_file))
         os.makedirs(out_dir, exist_ok=True)
 
-        # Write Excel using openpyxl only
+        # Write to Excel with openpyxl
         from openpyxl import Workbook
         from openpyxl.styles import Font
         from openpyxl.utils import get_column_letter
@@ -57,15 +74,15 @@ class FailureReportGenerator:
         ws = wb.active
         ws.title = "Failures"
 
-        # Header
+        # Write header
         headers = ["Test Name", "Failure Step"]
         ws.append(headers)
         for cell in ws[1]:
             cell.font = Font(bold=True)
 
-        # Rows
-        for step in steps:
-            ws.append([test_name, step])
+        # Write data rows
+        for row in rows:
+            ws.append(row)
 
         # Auto-size columns
         col_widths = {}
