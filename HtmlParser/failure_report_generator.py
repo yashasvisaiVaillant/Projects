@@ -1,10 +1,13 @@
 # This script generates a failure report from an HTML file containing test results.
 
+import csv
 import os
+from os import path
 import pandas as pd
 from bs4 import BeautifulSoup
 from failure_traverser import FailureTraverser
 from ExcelFormatter import ExcelFormatter
+
 
 class FailureReportGenerator:
     def __init__(self, html_file, output_file):
@@ -12,44 +15,102 @@ class FailureReportGenerator:
         self.output_file = output_file
 
     def run(self):
-        # Extract test name
-        test_name = os.path.basename(os.path.dirname(self.html_file))
-        # Detect encoding
-        import chardet
-        with open(self.html_file, 'rb') as f:
-            rawdata = f.read()
-        result = chardet.detect(rawdata)
-        encoding = result['encoding']
-        # Read HTML content
-        with open(self.html_file, encoding=encoding) as f:
-            html_content = f.read()
+        # Extract test name from parent folder of the HTML file
+        test_name = os.path.basename(os.path.dirname(os.path.abspath(self.html_file)))
+
+        # Read HTML content (robust decoding)
+        html_content = read_html_with_detected_encoding(self.html_file)
 
         # Parse HTML
         soup = BeautifulSoup(html_content, 'html.parser')
 
-        # Find top-level 'Failed' divs
+        # Find all 'div' elements with class 'Failed' anywhere in the document
         failed_divs = soup.find_all('div', class_='Failed')
 
         traverser = FailureTraverser()
-
         for div in failed_divs:
             traverser.traverse_failed_div(div)
 
-        print(f"Total unique failures recorded: {len(traverser.failure_set)}")  # Debug
+        print(f"Total unique failures recorded: {len(traverser.failure_set)}")
 
         # Do not generate a report if there are no failures
         if not traverser.failure_set:
             print(f"No failures found in {self.html_file}. Skipping report generation.")
-            return
+            return False
 
-        # Save failures to DataFrame
-        df = pd.DataFrame({'Failure Step': list(traverser.failure_set)})
-        df['Test Name'] = test_name
-        df = df[['Test Name', 'Failure Step']]
+        # Build deterministic, case-insensitive sorted list
+        steps = sorted(
+            traverser.failure_set,
+            key=lambda s: s.casefold() if isinstance(s, str) else str(s).casefold()
+        )
 
-        # Save to Excel
-        df.to_excel(self.output_file, index=False)
+        # Ensure output directory exists
+        out_dir = os.path.dirname(os.path.abspath(self.output_file))
+        os.makedirs(out_dir, exist_ok=True)
 
-        # Format the Excel file
-        formatter = ExcelFormatter(self.output_file)
-        formatter.adjust_columns()
+        # Write Excel using openpyxl only
+        from openpyxl import Workbook
+        from openpyxl.styles import Font
+        from openpyxl.utils import get_column_letter
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Failures"
+
+        # Header
+        headers = ["Test Name", "Failure Step"]
+        ws.append(headers)
+        for cell in ws[1]:
+            cell.font = Font(bold=True)
+
+        # Rows
+        for step in steps:
+            ws.append([test_name, step])
+
+        # Auto-size columns
+        col_widths = {}
+        for row in ws.iter_rows(values_only=True):
+            for idx, value in enumerate(row, start=1):
+                length = len(str(value)) if value is not None else 0
+                if length > col_widths.get(idx, 0):
+                    col_widths[idx] = length
+        for idx, width in col_widths.items():
+            ws.column_dimensions[get_column_letter(idx)].width = min(width + 2, 80)
+
+        # Save workbook
+        wb.save(self.output_file)
+        print(f"Excel report written to: {self.output_file}")
+        return True
+
+
+# Encoding robustness: Why it’s needed:
+# It was observed that some of the Test data HTML files came in different encodings (UTF‑8, UTF‑16)
+# This can raise UnicodeDecodeError or silently corrupt characters.
+# A robust approach tries detection first, then falls back safely.^
+
+def read_html_with_detected_encoding(path): 
+    # Read raw bytes 
+    with open(path, 'rb') as f: 
+        raw = f.read()
+    # Try chardet if available
+    enc = None
+    try:
+        import chardet
+        info = chardet.detect(raw) or {}
+        enc = info.get('encoding')
+    except Exception:
+        enc = None
+
+    # Try detected encoding strictly; on error, fall back
+    if enc:
+        try:
+            return raw.decode(enc, errors='strict')
+        except Exception:
+            pass
+
+    # Try BOM-aware UTF-8 first
+    try:
+        return raw.decode('utf-8-sig', errors='strict')
+    except Exception:
+        # Final fallback that never fails (may replace undecodable bytes)
+        return raw.decode('utf-8', errors='replace')
