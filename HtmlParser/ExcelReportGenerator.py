@@ -1,5 +1,5 @@
 import math
-from pathlib import Path
+from pathlib import PureWindowsPath
 
 from openpyxl import Workbook
 from openpyxl.cell.rich_text import CellRichText, TextBlock
@@ -23,7 +23,8 @@ class ExcelReportGenerator:
         for cell in worksheet[1]:
             cell.font = Font(bold=True)
 
-        report_uri = Path(report_file).resolve().as_uri()
+        # A canonical UNC URI stays valid when the workbook is moved elsewhere.
+        report_uri = PureWindowsPath(report_file).as_uri()
         for index, (step, reason) in enumerate(failures):
             worksheet.append([
                 test_name if index == 0 else '',

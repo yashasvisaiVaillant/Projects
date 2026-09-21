@@ -1,4 +1,4 @@
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from bs4 import BeautifulSoup
 from ExcelReportGenerator import ExcelReportGenerator
@@ -6,9 +6,10 @@ from failure_traverser import FailureTraverser
 
 
 class FailureReportGenerator:
-    def __init__(self, html_file, output_file):
+    def __init__(self, html_file, output_file, report_root=None):
         self.html_file = html_file
         self.output_file = output_file
+        self.report_root = report_root
 
     def run(self):
         html_path = Path(self.html_file).resolve()
@@ -16,6 +17,14 @@ class FailureReportGenerator:
         main_report = html_path.parent / f'{test_name}.html'
         if not main_report.exists():
             raise FileNotFoundError(f'Main report not found: {main_report}')
+
+        hyperlink_report = main_report
+        if self.report_root:
+            hyperlink_report = (
+                PureWindowsPath(self.report_root)
+                / test_name
+                / main_report.name
+            )
 
         # BeautifulSoup detects the BOM or declared encoding when given raw bytes.
         soup = BeautifulSoup(html_path.read_bytes(), 'html.parser')
@@ -42,6 +51,11 @@ class FailureReportGenerator:
             return False
 
         excel_report = ExcelReportGenerator(self.output_file)
-        excel_report.generate(test_name, result_type, failures, main_report)
+        excel_report.generate(
+            test_name,
+            result_type,
+            failures,
+            hyperlink_report
+        )
         print(f"Excel report written to: {self.output_file}")
         return True

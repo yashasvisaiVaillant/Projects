@@ -7,9 +7,17 @@ def main():
     parser = argparse.ArgumentParser(description='Generate failure report from HTML report file.')
     parser.add_argument('--html_file', type=str, required=True, help='Path to the input HTML report file.')
     parser.add_argument('--output_file', type=str, default='failure_report.xlsx', help='Path for the output Excel file.')
+    parser.add_argument(
+        '--report_root',
+        help='Canonical shared folder containing the test report folders.'
+    )
     args = parser.parse_args()
 
-    generator = FailureReportGenerator(args.html_file, args.output_file)
+    generator = FailureReportGenerator(
+        args.html_file,
+        args.output_file,
+        args.report_root
+    )
     try:
         created = generator.run()
         if created:
@@ -23,4 +31,3 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
-

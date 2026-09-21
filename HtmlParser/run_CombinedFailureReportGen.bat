@@ -8,12 +8,24 @@ REM Path to your scripts directory
 set "SCRIPTS_DIR=C:\Yashasvi\Projects\HtmlParser"
 REM set "SCRIPTS_DIR=\\vaders26\Reports\PHP2025\Scripts\HtmlParser"
 
-REM Use the newest test-run results file in the current directory.
+REM The batch file is stored in the test-run folder; use that folder for
+REM parsing, report creation, and portable UNC hyperlinks.
+set "REPORTS_ROOT=%~dp0"
+set "REPORTS_ROOT=%REPORTS_ROOT:~0,-1%"
+pushd "%REPORTS_ROOT%"
+if errorlevel 1 (
+    echo Unable to access reports folder: "%REPORTS_ROOT%"
+    pause
+    exit /b 1
+)
+
+REM Use the newest test-run results file in the reports directory.
 set "RESULTS_CSV="
 for /f "delims=" %%C in ('dir /b /a-d /o-d "*.csv" 2^>nul') do if not defined RESULTS_CSV set "RESULTS_CSV=%%~fC"
 
 if not defined RESULTS_CSV (
     echo No test-run CSV file found.
+    popd
     pause
     exit /b 1
 )
@@ -28,6 +40,7 @@ echo Merging reports...
 python "%SCRIPTS_DIR%\merge_reports.py" --results_csv "%RESULTS_CSV%"
 echo Merging complete.
 python -c "import time; print(f'Total time taken: {time.time() - float(\"%START_TIME%\"):,.2f} seconds')"
+popd
 pause
 endlocal
 goto :eof
@@ -44,13 +57,6 @@ if errorlevel 2 (
 )
 if errorlevel 1 (
     echo Test passed, skipping folder.
-    echo(
-    goto :eof
-)
-
-REM Skip if report already exists
-if exist "%FOLDER%\failure_report.xlsx" (
-    echo Report already exists, skipping folder.
     echo(
     goto :eof
 )
@@ -72,7 +78,8 @@ if not defined FIRST_HTML (
 echo Found: "%FIRST_HTML%"
 python "%SCRIPTS_DIR%\generate_report.py" ^
     --html_file "%FIRST_HTML%" ^
-    --output_file "%FOLDER%\failure_report.xlsx"
+    --output_file "%FOLDER%\failure_report.xlsx" ^
+    --report_root "%REPORTS_ROOT%"
 
 REM Blank line after processing this folder
 echo(
