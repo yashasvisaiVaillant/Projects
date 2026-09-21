@@ -1,4 +1,10 @@
+import math
+from pathlib import Path
+from urllib.parse import quote
+
 from openpyxl import Workbook, load_workbook
+from openpyxl.cell.rich_text import CellRichText, TextBlock
+from openpyxl.cell.text import InlineFont
 from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
 
@@ -7,33 +13,43 @@ class ExcelReportGenerator:
     def __init__(self, output_file):
         self.output_file = output_file
 
-    def generate(self, test_name, failure_steps):
-        rows = [[test_name, failure_steps[0]]]
-        rows.extend(['', step] for step in failure_steps[1:])
-
+    def generate(self, test_name, failures, report_file):
         workbook = Workbook()
         worksheet = workbook.active
         worksheet.title = "Failures"
 
-        worksheet.append(["Test Name", "Failure Step"])
+        worksheet.append(["Test Name", "Failure Step", "Failure Reason"])
         for cell in worksheet[1]:
             cell.font = Font(bold=True)
 
-        for row in rows:
-            worksheet.append(row)
-
-        column_widths = {}
-        for row in worksheet.iter_rows(values_only=True):
-            for column_index, value in enumerate(row, start=1):
-                length = len(str(value)) if value is not None else 0
-                column_widths[column_index] = max(
-                    length, column_widths.get(column_index, 0)
+        report_uri = Path(report_file).resolve().as_uri()
+        for index, (step, reason, location) in enumerate(failures):
+            worksheet.append([
+                test_name if index == 0 else '',
+                step,
+                reason
+            ])
+            reason_cell = worksheet.cell(row=index + 2, column=3)
+            expected_text, separator, actual_text = reason.partition('\nActual: ')
+            if separator:
+                reason_cell.value = CellRichText(
+                    f'{expected_text}\n',
+                    TextBlock(
+                        InlineFont(color='FFFF0000'),
+                        f'Actual: {actual_text}'
+                    )
+                )
+            else:
+                reason_cell.value = CellRichText(
+                    TextBlock(InlineFont(color='FFFF0000'), reason)
                 )
 
-        for column_index, width in column_widths.items():
-            column_letter = get_column_letter(column_index)
-            worksheet.column_dimensions[column_letter].width = min(width + 2, 80)
+            if location:
+                anchor = quote(location.lstrip('#'))
+                reason_cell.hyperlink = f'{report_uri}?failure={anchor}'
+                reason_cell.style = 'Hyperlink'
 
+        ExcelFormatter.format_worksheet(worksheet)
         workbook.save(self.output_file)
 
 
@@ -41,9 +57,14 @@ class ExcelFormatter:
     def __init__(self, filename):
         self.filename = filename
 
-    def merge_test_name_rows(self):
-        workbook = load_workbook(self.filename)
+    def format_combined_report(self):
+        workbook = load_workbook(self.filename, rich_text=True)
         worksheet = workbook.active
+        self.format_worksheet(worksheet)
+        self._merge_test_name_rows(worksheet)
+        workbook.save(self.filename)
+
+    def _merge_test_name_rows(self, worksheet):
         group_start = None
 
         for row_index in range(2, worksheet.max_row + 1):
@@ -60,8 +81,6 @@ class ExcelFormatter:
                 worksheet, group_start, worksheet.max_row
             )
 
-        workbook.save(self.filename)
-
     @staticmethod
     def _merge_test_name_group(worksheet, start_row, end_row):
         if end_row > start_row:
@@ -77,9 +96,9 @@ class ExcelFormatter:
             wrap_text=True
         )
 
-    def adjust_columns(self):
-        workbook = load_workbook(self.filename)
-        worksheet = workbook.active
+    @staticmethod
+    def format_worksheet(worksheet):
+        maximum_widths = {1: 35, 2: 70, 3: 65}
 
         for column_index, column_cells in enumerate(
             worksheet.columns, start=1
@@ -87,10 +106,37 @@ class ExcelFormatter:
             max_length = 0
             column_letter = get_column_letter(column_index)
             for cell in column_cells:
-                cell.alignment = Alignment(wrap_text=True)
+                cell.alignment = Alignment(wrap_text=True, vertical='top')
                 if cell.value:
-                    max_length = max(max_length, len(str(cell.value)))
+                    line_length = max(
+                        len(line) for line in str(cell.value).splitlines()
+                    )
+                    max_length = max(max_length, line_length)
 
-            worksheet.column_dimensions[column_letter].width = max_length + 2
+            maximum_width = maximum_widths.get(column_index, 50)
+            worksheet.column_dimensions[column_letter].width = min(
+                max(max_length + 2, 12),
+                maximum_width
+            )
 
-        workbook.save(self.filename)
+        worksheet.row_dimensions[1].height = 22
+        for row_index in range(2, worksheet.max_row + 1):
+            wrapped_lines = 1
+            for column_index in range(1, worksheet.max_column + 1):
+                value = worksheet.cell(row=row_index, column=column_index).value
+                if value is None:
+                    continue
+
+                width = worksheet.column_dimensions[
+                    get_column_letter(column_index)
+                ].width
+                line_count = sum(
+                    max(1, math.ceil(len(line) / width))
+                    for line in str(value).splitlines()
+                )
+                wrapped_lines = max(wrapped_lines, line_count)
+
+            worksheet.row_dimensions[row_index].height = min(
+                wrapped_lines * 15,
+                150
+            )
