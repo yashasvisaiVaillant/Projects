@@ -5,7 +5,8 @@ from ExcelReportGenerator import ExcelFormatter
 
 def main():
     main_dir = os.getcwd()
-    output_file = os.path.join(main_dir, 'combined_failure_report.xlsx')
+    folder_name = os.path.basename(os.path.normpath(main_dir))
+    output_file = os.path.join(main_dir, f'Failure_Report_{folder_name}.xlsx')
     all_dfs = []
 
     for folder in os.listdir(main_dir):

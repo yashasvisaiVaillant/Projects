@@ -1,9 +1,9 @@
 # Traverses the HTML report to find all failures and their hierarchy for reporting purposes in failure_report_generator.py
-from bs4 import BeautifulSoup
 
 class FailureTraverser:
     def __init__(self):
-        self.failure_set = set() # To remove any duplicate entries
+        self.failure_set = set()
+        self.failure_steps = []
 
     # Get the hierarchy of each failure to add to the report
     def get_full_hierarchy(self, failed_div):
@@ -44,5 +44,7 @@ class FailureTraverser:
             if not hasattr(self, 'hierarchies'):
                 self.hierarchies = []
             self.hierarchies.append(hierarchy)
-            reason = ' | '.join(hierarchy)
-            self.failure_set.add(reason)
+            reason = ' --> '.join(hierarchy)
+            if reason not in self.failure_set:
+                self.failure_set.add(reason)
+                self.failure_steps.append(reason)

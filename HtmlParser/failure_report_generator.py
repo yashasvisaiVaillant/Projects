@@ -68,11 +68,8 @@ class FailureReportGenerator:
             print(f"No failures found in {self.html_file}. Skipping report generation.")
             return False
             
-        # Build sorted list of failure steps
-        steps = sorted(
-            traverser.failure_set,
-            key=lambda s: s.casefold() if isinstance(s, str) else str(s).casefold()
-        )
+        # Preserve the sequence in which failures appear in the HTML report.
+        steps = traverser.failure_steps
 
         excel_report = ExcelReportGenerator(self.output_file)
         excel_report.generate(test_name, steps)
