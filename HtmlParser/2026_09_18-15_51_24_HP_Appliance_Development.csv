@@ -1,0 +1,6 @@
+,polarion_id,title,verdict,comment
+36,HPAD-8108,HPAD-8108_E4_Mono - Manual active cooling,TestVerdict.Error,
+41,HPAD-8094,HPAD-8094_E4_Central heating interrupted by DHW,TestVerdict.Failed,
+42,HPAD-8098,HPAD-8098_E4_Trigger Deicing during DHW,TestVerdict.Passed,
+124,HPAD-12832,HPAD-12832_E4_GSHP_HMI_BasicCommissioning,TestVerdict.Failed,
+130,HPAD-12759,HPAD-12759 - E4 - TWV in error state,TestVerdict.Failed,
