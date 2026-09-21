@@ -1,8 +1,7 @@
 import math
 from pathlib import Path
-from urllib.parse import quote
 
-from openpyxl import Workbook, load_workbook
+from openpyxl import Workbook
 from openpyxl.cell.rich_text import CellRichText, TextBlock
 from openpyxl.cell.text import InlineFont
 from openpyxl.styles import Alignment, Font
@@ -23,7 +22,7 @@ class ExcelReportGenerator:
             cell.font = Font(bold=True)
 
         report_uri = Path(report_file).resolve().as_uri()
-        for index, (step, reason, location) in enumerate(failures):
+        for index, (step, reason) in enumerate(failures):
             worksheet.append([
                 test_name if index == 0 else '',
                 step,
@@ -44,40 +43,34 @@ class ExcelReportGenerator:
                     TextBlock(InlineFont(color='FFFF0000'), reason)
                 )
 
-            if location:
-                anchor = quote(location.lstrip('#'))
-                reason_cell.hyperlink = f'{report_uri}?failure={anchor}'
-                reason_cell.style = 'Hyperlink'
+            reason_cell.hyperlink = report_uri
+            reason_cell.style = 'Hyperlink'
 
         ExcelFormatter.format_worksheet(worksheet)
         workbook.save(self.output_file)
 
 
 class ExcelFormatter:
-    def __init__(self, filename):
-        self.filename = filename
+    @classmethod
+    def format_combined_worksheet(cls, worksheet):
+        cls.format_worksheet(worksheet)
+        cls._merge_test_name_rows(worksheet)
 
-    def format_combined_report(self):
-        workbook = load_workbook(self.filename, rich_text=True)
-        worksheet = workbook.active
-        self.format_worksheet(worksheet)
-        self._merge_test_name_rows(worksheet)
-        workbook.save(self.filename)
-
-    def _merge_test_name_rows(self, worksheet):
+    @classmethod
+    def _merge_test_name_rows(cls, worksheet):
         group_start = None
 
         for row_index in range(2, worksheet.max_row + 1):
             test_name = worksheet.cell(row=row_index, column=1).value
             if test_name not in (None, ''):
                 if group_start is not None:
-                    self._merge_test_name_group(
+                    cls._merge_test_name_group(
                         worksheet, group_start, row_index - 1
                     )
                 group_start = row_index
 
         if group_start is not None:
-            self._merge_test_name_group(
+            cls._merge_test_name_group(
                 worksheet, group_start, worksheet.max_row
             )
 
@@ -98,6 +91,7 @@ class ExcelFormatter:
 
     @staticmethod
     def format_worksheet(worksheet):
+        # Fixed caps keep long paths and diagnostics compact while wrapping.
         maximum_widths = {1: 35, 2: 70, 3: 65}
 
         for column_index, column_cells in enumerate(
@@ -120,6 +114,7 @@ class ExcelFormatter:
             )
 
         worksheet.row_dimensions[1].height = 22
+        # Estimate enough height for explicit and width-induced line wrapping.
         for row_index in range(2, worksheet.max_row + 1):
             wrapped_lines = 1
             for column_index in range(1, worksheet.max_column + 1):

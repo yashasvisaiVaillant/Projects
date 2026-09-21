@@ -1,50 +1,69 @@
-# Traverses the HTML report to find all failures and their hierarchy for reporting purposes in failure_report_generator.py
+import re
+
 
 class FailureTraverser:
     def __init__(self):
-        self.failure_set = set()
-        self.failure_steps = []
+        self._failure_steps = []
 
-    # Get the hierarchy of each failure to add to the report
     def get_full_hierarchy(self, failed_div):
         hierarchy = []
         current = failed_div
-        
+
         while current:
             header = current.find('div', class_='header_Failed')
             if header:
-                name = header.find('span', class_='tb_name') # gives the test-step name
-                #library = header.find('span', class_='tb_library') # gives the library used
-
-                # Create a String with the affected test-step and library
-                parts = []
+                name = header.find('span', class_='tb_name')
                 if name:
-                    parts.append(name.get_text(strip=True))
-                #if library: # Can be included if required
-                    #parts.append(library.get_text(strip=True))
-                hierarchy.insert(0, ' '.join(parts)) # builds the location of Failure (from bottom to top)
-            parent_failed = current.find_parent('div', class_='Failed') # returns None if no parent exists with div class Failed
-            current = parent_failed
+                    hierarchy.insert(0, name.get_text(strip=True))
+            current = current.find_parent('div', class_='Failed')
 
-        # Exclude the first 3 entries since they are common to all failures and not relevant to the report
+        # The outer sequence, test case, and phase are common report scaffolding.
         return hierarchy[3:]
 
     def traverse_failed_div(self, div):
-        # Check for the attribute nested 'body-expanded'-> this indicates that there are more failures nested within
         nested_bodies = div.find_all('div', class_='body-expanded', recursive=False)
         if nested_bodies:
             for body in nested_bodies:
-                nested_failed_divs = body.find_all('div', class_='Failed', recursive=False)
-                for nf in nested_failed_divs:
-                    self.traverse_failed_div(nf)
+                for nested_failure in body.find_all(
+                    'div', class_='Failed', recursive=False
+                ):
+                    self.traverse_failed_div(nested_failure)
         else:
-            # Process failure and get hierarchy
             hierarchy = self.get_full_hierarchy(div)
-            # Store hierarchy for later use
-            if not hasattr(self, 'hierarchies'):
-                self.hierarchies = []
-            self.hierarchies.append(hierarchy)
-            reason = ' --> '.join(hierarchy)
-            if reason not in self.failure_set:
-                self.failure_set.add(reason)
-                self.failure_steps.append(reason)
+            self._failure_steps.append(' --> '.join(hierarchy))
+
+    def get_failure_records(self, soup):
+        # Detail blocks occur in the same document order as the overview leaves.
+        decisions = soup.find_all('div', class_='FailedDecision')
+        if len(decisions) != len(self._failure_steps):
+            raise ValueError(
+                'Failure steps and failure reasons could not be matched.'
+            )
+
+        records = []
+        seen_steps = set()
+        for step, decision in zip(self._failure_steps, decisions):
+            if step in seen_steps:
+                continue
+
+            seen_steps.add(step)
+            details = decision.find('div', recursive=False)
+            # Remove invisible separators and volatile timestamps from diagnostics.
+            detail_lines = [
+                re.sub(r'^\([^)]*\)\s*', '', line.strip())
+                for line in details.get_text('\n', strip=True)
+                .replace('\u200b', '')
+                .splitlines()
+                if line.strip()
+            ] if details else []
+            if len(detail_lines) >= 2:
+                reason = (
+                    f'Expected: {detail_lines[0]}\n'
+                    f'Actual: {" ".join(detail_lines[1:])}'
+                )
+            else:
+                reason = f'Actual: {detail_lines[0]}' if detail_lines else ''
+
+            records.append((step, reason))
+
+        return records

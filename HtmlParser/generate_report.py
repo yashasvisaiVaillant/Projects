@@ -1,8 +1,7 @@
-# Main function
-
 import argparse
 import sys
 from failure_report_generator import FailureReportGenerator
+
 
 def main():
     parser = argparse.ArgumentParser(description='Generate failure report from HTML report file.')
@@ -17,12 +16,11 @@ def main():
             print("Report created.")
         else:
             print("No failures; report not created.")
-        sys.exit(0)
+        return 0
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
+        return 1
 
 if __name__ == '__main__':
-    main()
-
+    sys.exit(main())
 

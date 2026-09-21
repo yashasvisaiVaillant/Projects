@@ -1,30 +1,51 @@
-# Merges individual failure reports into a single Excel file and formats it
 import os
-import pandas as pd
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Font
 from ExcelReportGenerator import ExcelFormatter
 
 def main():
     main_dir = os.getcwd()
     folder_name = os.path.basename(os.path.normpath(main_dir))
     output_file = os.path.join(main_dir, f'Failure_Report_{folder_name}.xlsx')
-    all_dfs = []
+    report_paths = []
 
     for folder in os.listdir(main_dir):
         folder_path = os.path.join(main_dir, folder)
         if os.path.isdir(folder_path):
             report_path = os.path.join(folder_path, 'failure_report.xlsx')
             if os.path.exists(report_path):
-                df = pd.read_excel(report_path)
-                all_dfs.append(df)
+                report_paths.append(report_path)
 
-    if all_dfs:
-        combined_df = pd.concat(all_dfs, ignore_index=True)
-        combined_df.to_excel(output_file, index=False)
+    if report_paths:
+        combined_workbook = Workbook()
+        combined_worksheet = combined_workbook.active
+        combined_worksheet.title = "Failures"
+        combined_worksheet.append(
+            ["Test Name", "Failure Step", "Failure Reason"]
+        )
+        for cell in combined_worksheet[1]:
+            cell.font = Font(bold=True)
+
+        for report_path in report_paths:
+            report_workbook = load_workbook(report_path, rich_text=True)
+            report_worksheet = report_workbook.active
+            for source_row in report_worksheet.iter_rows(
+                min_row=2, max_col=3
+            ):
+                combined_worksheet.append(
+                    [cell.value for cell in source_row]
+                )
+                if source_row[2].hyperlink:
+                    target_cell = combined_worksheet.cell(
+                        row=combined_worksheet.max_row, column=3
+                    )
+                    target_cell.hyperlink = source_row[2].hyperlink.target
+                    target_cell.style = 'Hyperlink'
+            report_workbook.close()
+
+        ExcelFormatter.format_combined_worksheet(combined_worksheet)
+        combined_workbook.save(output_file)
         print(f"Combined report saved to {output_file}")
-
-        formatter = ExcelFormatter(output_file)
-        formatter.adjust_columns()
-        formatter.merge_test_name_rows()
     else:
         print("No individual reports found to merge.")
 
