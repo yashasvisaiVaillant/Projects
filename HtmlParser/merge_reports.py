@@ -1,17 +1,30 @@
+import argparse
 import os
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font
 from ExcelReportGenerator import ExcelFormatter
+from test_result_filter import REPORTABLE_VERDICTS, load_test_verdicts
 
 def main():
+    parser = argparse.ArgumentParser(
+        description='Combine failure and error reports.'
+    )
+    parser.add_argument('--results_csv')
+    args = parser.parse_args()
+
     main_dir = os.getcwd()
     folder_name = os.path.basename(os.path.normpath(main_dir))
     output_file = os.path.join(main_dir, f'Failure_Report_{folder_name}.xlsx')
     report_paths = []
+    verdicts = (
+        load_test_verdicts(args.results_csv) if args.results_csv else None
+    )
 
     for folder in sorted(os.listdir(main_dir), key=str.casefold):
         folder_path = os.path.join(main_dir, folder)
         if os.path.isdir(folder_path):
+            if verdicts is not None and verdicts.get(folder) not in REPORTABLE_VERDICTS:
+                continue
             report_path = os.path.join(folder_path, 'failure_report.xlsx')
             if os.path.exists(report_path):
                 report_paths.append(report_path)
