@@ -1,10 +1,9 @@
 # This script generates a failure report from an HTML file containing test results.
 
 import os
-import pandas as pd
 from bs4 import BeautifulSoup
+from ExcelReportGenerator import ExcelReportGenerator
 from failure_traverser import FailureTraverser
-from ExcelFormatter import ExcelFormatter
 
 
 def read_html_with_detected_encoding(path): 
@@ -75,53 +74,7 @@ class FailureReportGenerator:
             key=lambda s: s.casefold() if isinstance(s, str) else str(s).casefold()
         )
 
-        # Prepare data for DataFrame: first row with test name + first failure step
-        rows = []
-
-        if steps:
-            # First row: include test name and first failure step
-            rows.append([test_name, steps[0]])
-            # Remaining rows: only failure steps, leave test name cell empty
-            for step in steps[1:]:
-                rows.append(['', step])
-        else:
-            # No failures, no report
-            print(f"No failures found in {self.html_file}. Skipping report generation.")
-            return False
-
-        # Create DataFrame
-        df = pd.DataFrame(rows, columns=['Test Name', 'Failure Step'])
-
-        # Write to Excel with openpyxl
-        from openpyxl import Workbook
-        from openpyxl.styles import Font
-        from openpyxl.utils import get_column_letter
-
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "Failures"
-
-        # Write header
-        headers = ["Test Name", "Failure Step"]
-        ws.append(headers)
-        for cell in ws[1]:
-            cell.font = Font(bold=True)
-
-        # Write data rows
-        for row in rows:
-            ws.append(row)
-
-        # Auto-size columns
-        col_widths = {}
-        for row in ws.iter_rows(values_only=True):
-            for idx, value in enumerate(row, start=1):
-                length = len(str(value)) if value is not None else 0
-                if length > col_widths.get(idx, 0):
-                    col_widths[idx] = length
-        for idx, width in col_widths.items():
-            ws.column_dimensions[get_column_letter(idx)].width = min(width + 2, 80)
-
-        # Save workbook
-        wb.save(self.output_file)
+        excel_report = ExcelReportGenerator(self.output_file)
+        excel_report.generate(test_name, steps)
         print(f"Excel report written to: {self.output_file}")
         return True

@@ -1,7 +1,7 @@
 # Merges individual failure reports into a single Excel file and formats it
 import os
 import pandas as pd
-from ExcelFormatter import ExcelFormatter
+from ExcelReportGenerator import ExcelFormatter
 
 def main():
     main_dir = os.getcwd()
@@ -20,12 +20,12 @@ def main():
         combined_df = pd.concat(all_dfs, ignore_index=True)
         combined_df.to_excel(output_file, index=False)
         print(f"Combined report saved to {output_file}")
+
+        formatter = ExcelFormatter(output_file)
+        formatter.adjust_columns()
+        formatter.merge_test_name_rows()
     else:
         print("No individual reports found to merge.")
-
-    # format the Excel file
-    formatter = ExcelFormatter('combined_failure_report.xlsx')
-    formatter.adjust_columns()
 
 if __name__ == "__main__":
     main()
