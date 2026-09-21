@@ -1,7 +1,7 @@
 @echo off
 setlocal
 
-REM Record a high-resolution start time for the complete generation and merge.
+REM Time the complete batch run.
 for /f %%T in ('python -c "import time; print(time.time())"') do set "START_TIME=%%T"
 
 REM Path to your scripts directory
@@ -27,7 +27,7 @@ echo All subfolders processed.
 echo Merging reports...
 python "%SCRIPTS_DIR%\merge_reports.py" --results_csv "%RESULTS_CSV%"
 echo Merging complete.
-python -c "import time; print(f'Total time taken: {(time.time() - float(\"%START_TIME%\")) / 60:.2f} minutes')"
+python -c "import time; print(f'Total time taken: {time.time() - float(\"%START_TIME%\"):,.2f} seconds')"
 pause
 endlocal
 goto :eof
