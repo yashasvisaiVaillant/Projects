@@ -2,6 +2,10 @@ import re
 
 
 class FailureTraverser:
+    RESULT_STATES = ('Failed', 'Error')
+    RESULT_HEADERS = ('header_Failed', 'header_Error')
+    RESULT_DECISIONS = ('FailedDecision', 'ErrorDecision')
+
     def __init__(self):
         self._failure_steps = []
 
@@ -10,12 +14,14 @@ class FailureTraverser:
         current = failed_div
 
         while current:
-            header = current.find('div', class_='header_Failed')
+            header = current.find(
+                'div', class_=self.RESULT_HEADERS, recursive=False
+            )
             if header:
                 name = header.find('span', class_='tb_name')
                 if name:
                     hierarchy.insert(0, name.get_text(strip=True))
-            current = current.find_parent('div', class_='Failed')
+            current = current.find_parent('div', class_=self.RESULT_STATES)
 
         # The outer sequence, test case, and phase are common report scaffolding.
         return hierarchy[3:]
@@ -25,7 +31,7 @@ class FailureTraverser:
         if nested_bodies:
             for body in nested_bodies:
                 for nested_failure in body.find_all(
-                    'div', class_='Failed', recursive=False
+                    'div', class_=self.RESULT_STATES, recursive=False
                 ):
                     self.traverse_failed_div(nested_failure)
         else:
@@ -34,12 +40,20 @@ class FailureTraverser:
 
     def get_failure_records(self, soup):
         # Detail blocks occur in the same document order as the overview leaves.
-        decisions = soup.find_all('div', class_='FailedDecision')
+        decisions = soup.find_all('div', class_=self.RESULT_DECISIONS)
         if len(decisions) != len(self._failure_steps):
             raise ValueError(
                 'Failure steps and failure reasons could not be matched.'
             )
 
+        result_type = (
+            'Error'
+            if any(
+                'ErrorDecision' in decision.get('class', [])
+                for decision in decisions
+            )
+            else 'Failure'
+        )
         records = []
         seen_steps = set()
         for step, decision in zip(self._failure_steps, decisions):
@@ -66,4 +80,4 @@ class FailureTraverser:
 
             records.append((step, reason))
 
-        return records
+        return result_type, records

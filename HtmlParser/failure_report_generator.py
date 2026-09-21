@@ -19,17 +19,21 @@ class FailureReportGenerator:
 
         # BeautifulSoup detects the BOM or declared encoding when given raw bytes.
         soup = BeautifulSoup(html_path.read_bytes(), 'html.parser')
-        # Start only at roots; the traverser recursively visits nested failures.
-        failed_divs = [
-            div for div in soup.find_all('div', class_='Failed')
-            if div.find_parent('div', class_='Failed') is None
+        # Start only at roots; the traverser recursively visits failed/error nodes.
+        result_divs = [
+            div for div in soup.find_all(
+                'div', class_=FailureTraverser.RESULT_STATES
+            )
+            if div.find_parent(
+                'div', class_=FailureTraverser.RESULT_STATES
+            ) is None
         ]
 
         traverser = FailureTraverser()
-        for div in failed_divs:
+        for div in result_divs:
             traverser.traverse_failed_div(div)
 
-        failures = traverser.get_failure_records(soup)
+        result_type, failures = traverser.get_failure_records(soup)
         failure_count = len(failures)
         print(f"Total unique failures recorded: {failure_count}")
 
@@ -38,6 +42,6 @@ class FailureReportGenerator:
             return False
 
         excel_report = ExcelReportGenerator(self.output_file)
-        excel_report.generate(test_name, failures, main_report)
+        excel_report.generate(test_name, result_type, failures, main_report)
         print(f"Excel report written to: {self.output_file}")
         return True

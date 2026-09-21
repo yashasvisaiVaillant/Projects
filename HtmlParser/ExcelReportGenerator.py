@@ -12,12 +12,14 @@ class ExcelReportGenerator:
     def __init__(self, output_file):
         self.output_file = output_file
 
-    def generate(self, test_name, failures, report_file):
+    def generate(self, test_name, result_type, failures, report_file):
         workbook = Workbook()
         worksheet = workbook.active
         worksheet.title = "Failures"
 
-        worksheet.append(["Test Name", "Failure Step", "Failure Reason"])
+        worksheet.append(
+            ["Test Name", "Result Type", "Failure Step", "Failure Reason"]
+        )
         for cell in worksheet[1]:
             cell.font = Font(bold=True)
 
@@ -25,10 +27,11 @@ class ExcelReportGenerator:
         for index, (step, reason) in enumerate(failures):
             worksheet.append([
                 test_name if index == 0 else '',
+                result_type if index == 0 else '',
                 step,
                 reason
             ])
-            reason_cell = worksheet.cell(row=index + 2, column=3)
+            reason_cell = worksheet.cell(row=index + 2, column=4)
             expected_text, separator, actual_text = reason.partition('\nActual: ')
             if separator:
                 reason_cell.value = CellRichText(
@@ -46,53 +49,55 @@ class ExcelReportGenerator:
             reason_cell.hyperlink = report_uri
             reason_cell.style = 'Hyperlink'
 
-        ExcelFormatter.format_worksheet(worksheet)
+        ExcelFormatter.format_report_worksheet(worksheet)
         workbook.save(self.output_file)
 
 
 class ExcelFormatter:
     @classmethod
-    def format_combined_worksheet(cls, worksheet):
+    def format_report_worksheet(cls, worksheet):
         cls.format_worksheet(worksheet)
-        cls._merge_test_name_rows(worksheet)
+        cls._merge_test_rows(worksheet)
 
     @classmethod
-    def _merge_test_name_rows(cls, worksheet):
+    def _merge_test_rows(cls, worksheet):
         group_start = None
 
         for row_index in range(2, worksheet.max_row + 1):
             test_name = worksheet.cell(row=row_index, column=1).value
             if test_name not in (None, ''):
                 if group_start is not None:
-                    cls._merge_test_name_group(
+                    cls._merge_test_group(
                         worksheet, group_start, row_index - 1
                     )
                 group_start = row_index
 
         if group_start is not None:
-            cls._merge_test_name_group(
+            cls._merge_test_group(
                 worksheet, group_start, worksheet.max_row
             )
 
     @staticmethod
-    def _merge_test_name_group(worksheet, start_row, end_row):
-        if end_row > start_row:
-            worksheet.merge_cells(
-                start_row=start_row,
-                start_column=1,
-                end_row=end_row,
-                end_column=1
-            )
+    def _merge_test_group(worksheet, start_row, end_row):
+        for column in (1, 2):
+            if end_row > start_row:
+                worksheet.merge_cells(
+                    start_row=start_row,
+                    start_column=column,
+                    end_row=end_row,
+                    end_column=column
+                )
 
-        worksheet.cell(row=start_row, column=1).alignment = Alignment(
-            vertical='center',
-            wrap_text=True
-        )
+            worksheet.cell(row=start_row, column=column).alignment = Alignment(
+                vertical='center',
+                wrap_text=True
+            )
 
     @staticmethod
     def format_worksheet(worksheet):
         # Fixed caps keep long paths and diagnostics compact while wrapping.
-        maximum_widths = {1: 35, 2: 70, 3: 65}
+        maximum_widths = {1: 35, 2: 12, 3: 70, 4: 65}
+        worksheet.auto_filter.ref = worksheet.dimensions
 
         for column_index, column_cells in enumerate(
             worksheet.columns, start=1
